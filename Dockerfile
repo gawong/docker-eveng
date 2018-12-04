@@ -1,11 +1,14 @@
 FROM ubuntu:16.04
 
-LABEL MAINTAINER="pdefreitas"
+LABEL MAINTAINER="pdefreitas" CUSTOM_MAINTAINER="gwong"
 
 USER root
 
+# copy hostname and hosts files with EVE-NG entries
 COPY ./etc/* /etc/
 
+#Reminder - git ignores ./images/ folder
+#Reminder - preload iol image files into gitrepo folder before building eve-ng image
 COPY ./images/iol/* /opt/unetlab/addons/iol/bin/
 
 # Avoid ERROR: invoke-rc.d: policy-rc.d denied execution of start.
@@ -13,6 +16,10 @@ RUN sed -i "s/^exit 101$/exit 0/" /usr/sbin/policy-rc.d
 
 RUN echo "root:eve" | chpasswd
 
+# Use apt-cacher NG for faster container builds; sameersbn/aptcacher-ng container should be running.
+RUN echo 'Acquire::HTTP::Proxy "http://172.17.0.1:3142";' >> /etc/apt/apt.conf.d/01proxy \
+ && echo 'Acquire::HTTPS::Proxy "false";' >> /etc/apt/apt.conf.d/01proxy
+ 
 RUN apt-get update && apt-get upgrade -y
 
 RUN apt-get install -y apt-utils wget bash software-properties-common sudo
@@ -64,7 +71,12 @@ EOF
 
 RUN touch /opt/ovf/.configured
 
+#Reminder - entrypoint.sh runs piscokeygen.py, then bash shell
 COPY entrypoint.sh /root/entrypoint.sh
 COPY piscokeygen.py /root/piscokeygen.py
+
+#permit inbound http and ssh traffic
+EXPOSE 80/tcp
+EXPOSE 443/tcp
 
 ENTRYPOINT [ "/root/entrypoint.sh" ]
